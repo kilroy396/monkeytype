@@ -30,7 +30,11 @@ import {
   TimerOpacity,
 } from "@monkeytype/contracts/schemas/configs";
 import { convertRemToPixels } from "../utils/numbers";
-import { getActiveFunboxes } from "./funbox/list";
+import {
+  findSingleActiveFunboxWithFunction,
+  getActiveFunboxesWithFunction,
+} from "./funbox/list";
+import * as TestState from "./test-state";
 
 async function gethtml2canvas(): Promise<typeof import("html2canvas").default> {
   return (await import("html2canvas")).default;
@@ -186,6 +190,11 @@ ConfigEvent.subscribe((eventKey, eventValue, nosave) => {
     } else {
       scrollTape();
     }
+    updateLiveStatsMargin();
+  }
+
+  if (eventKey === "tapeMargin") {
+    updateLiveStatsMargin();
   }
 
   if (typeof eventValue !== "boolean") return;
@@ -331,10 +340,10 @@ function getWordHTML(word: string): string {
   let newlineafter = false;
   let retval = `<div class='word'>`;
 
-  const funbox = getActiveFunboxes().find((f) => f.functions?.getWordHtml);
+  const funbox = findSingleActiveFunboxWithFunction("getWordHtml");
   const chars = Strings.splitIntoCharacters(word);
   for (const char of chars) {
-    if (funbox?.functions?.getWordHtml) {
+    if (funbox) {
       retval += funbox.functions.getWordHtml(char, true);
     } else if (char === "\t") {
       retval += `<letter class='tabChar'><i class="fas fa-long-arrow-alt-right fa-fw"></i></letter>`;
@@ -469,7 +478,7 @@ export async function updateWordsInputPosition(initial = false): Promise<void> {
 
   if (Config.tapeMode !== "off") {
     el.style.top = targetTop + "px";
-    el.style.left = activeWord.offsetLeft + "px";
+    el.style.left = Config.tapeMargin + "%";
     return;
   }
 
@@ -647,8 +656,8 @@ export async function screenshot(): Promise<void> {
     }
     (document.querySelector("html") as HTMLElement).style.scrollBehavior =
       "smooth";
-    for (const fb of getActiveFunboxes()) {
-      fb.functions?.applyGlobalCSS?.();
+    for (const fb of getActiveFunboxesWithFunction("applyGlobalCSS")) {
+      fb.functions.applyGlobalCSS();
     }
   }
 
@@ -689,8 +698,8 @@ export async function screenshot(): Promise<void> {
   $(".highlightContainer").addClass("hidden");
   if (revertCookie) $("#cookiesModal").addClass("hidden");
 
-  for (const fb of getActiveFunboxes()) {
-    fb.functions?.clearGlobal?.();
+  for (const fb of getActiveFunboxesWithFunction("clearGlobal")) {
+    fb.functions.clearGlobal();
   }
 
   (document.querySelector("html") as HTMLElement).style.scrollBehavior = "auto";
@@ -838,7 +847,7 @@ export async function updateActiveWordLetters(
       }
     }
 
-    const funbox = getActiveFunboxes().find((fb) => fb.functions?.getWordHtml);
+    const funbox = findSingleActiveFunboxWithFunction("getWordHtml");
 
     const inputChars = Strings.splitIntoCharacters(input);
     const currentWordChars = Strings.splitIntoCharacters(currentWord);
@@ -848,8 +857,8 @@ export async function updateActiveWordLetters(
       let currentLetter = currentWordChars[i] as string;
       let tabChar = "";
       let nlChar = "";
-      if (funbox?.functions?.getWordHtml) {
-        const cl = funbox.functions?.getWordHtml(currentLetter);
+      if (funbox) {
+        const cl = funbox.functions.getWordHtml(currentLetter);
         if (cl !== "") {
           currentLetter = cl;
         }
@@ -938,6 +947,19 @@ export async function updateActiveWordLetters(
 
 export function scrollTape(): void {
   if (ActivePage.get() !== "test" || resultVisible) return;
+
+  if (!TestState.isActive) {
+    $("#words")
+      .stop(true, false)
+      .animate(
+        {
+          marginLeft: Config.tapeMargin + "%",
+        },
+        SlowTimer.get() ? 0 : 125
+      );
+    return;
+  }
+
   const wordsWrapperWidth = (
     document.querySelector("#wordsWrapper") as HTMLElement
   ).offsetWidth;
@@ -982,7 +1004,9 @@ export function scrollTape(): void {
       }
     }
   }
-  const newMargin = wordsWrapperWidth / 2 - (fullWordsWidth + currentWordWidth);
+
+  const tapeMargin = wordsWrapperWidth * (Config.tapeMargin / 100);
+  const newMargin = tapeMargin - (fullWordsWidth + currentWordWidth);
   if (Config.smoothLineScroll) {
     $("#words")
       .stop(true, false)
@@ -1140,7 +1164,7 @@ export function setLigatures(isEnabled: boolean): void {
 async function loadWordsHistory(): Promise<boolean> {
   $("#resultWordsHistory .words").empty();
   let wordsHTML = "";
-  for (let i = 0; i < TestInput.input.history.length + 2; i++) {
+  for (let i = 0; i < TestInput.input.getHistory().length + 2; i++) {
     const input = TestInput.input.getHistory(i);
     const corrected = TestInput.corrected.getHistory(i);
     const word = TestWords.words.get(i);
@@ -1460,6 +1484,20 @@ function updateWordsWidth(): void {
   }
 }
 
+function updateLiveStatsMargin(): void {
+  if (Config.tapeMode === "off") {
+    $("#liveStatsMini").css({
+      "justify-content": "start",
+      "margin-left": "0.25em",
+    });
+  } else {
+    $("#liveStatsMini").css({
+      "justify-content": "center",
+      "margin-left": Config.tapeMargin + "%",
+    });
+  }
+}
+
 function updateLiveStatsOpacity(value: TimerOpacity): void {
   $("#barTimerProgress").css("opacity", parseFloat(value as string));
   $("#liveStatsTextTop").css("opacity", parseFloat(value as string));
@@ -1509,11 +1547,11 @@ $(".pageTest").on("click", "#saveScreenshotButton", () => {
 $(".pageTest #copyWordsListButton").on("click", async () => {
   let words;
   if (Config.mode === "zen") {
-    words = TestInput.input.history.join(" ");
+    words = TestInput.input.getHistory().join(" ");
   } else {
     words = TestWords.words
       .get()
-      .slice(0, TestInput.input.history.length)
+      .slice(0, TestInput.input.getHistory().length)
       .join(" ");
   }
   await copyToClipboard(words);
@@ -1522,7 +1560,7 @@ $(".pageTest #copyWordsListButton").on("click", async () => {
 $(".pageTest #copyMissedWordsListButton").on("click", async () => {
   let words;
   if (Config.mode === "zen") {
-    words = TestInput.input.history.join(" ");
+    words = TestInput.input.getHistory().join(" ");
   } else {
     words = Object.keys(TestInput.missedWords ?? {}).join(" ");
   }

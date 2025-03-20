@@ -437,7 +437,12 @@ export async function addResult(
 
   if (completedEvent.mode === "time" && completedEvent.mode2 === "60") {
     void UserDAL.incrementBananas(uid, completedEvent.wpm);
-    if (isPb && user.discordId !== undefined && user.discordId !== "") {
+    if (
+      isPb &&
+      user.discordId !== undefined &&
+      user.discordId !== "" &&
+      user.lbOptOut !== true
+    ) {
       void GeorgeQueue.updateDiscordRole(user.discordId, completedEvent.wpm);
     }
   }
@@ -588,6 +593,7 @@ export async function addResult(
           discordId: user.discordId,
           badgeId: selectedBadgeId,
           lastActivityTimestamp: Date.now(),
+          isPremium,
         },
         xpGained: xpGained.xp,
         timeTypedSeconds: totalDurationTypedSeconds,

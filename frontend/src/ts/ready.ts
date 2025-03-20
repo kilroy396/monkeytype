@@ -7,14 +7,11 @@ import * as AccountButton from "./elements/account-button";
 //@ts-expect-error
 import Konami from "konami";
 import * as ServerConfiguration from "./ape/server-configuration";
-import { getActiveFunboxes } from "./test/funbox/list";
+import { getActiveFunboxesWithFunction } from "./test/funbox/list";
 import { loadPromise } from "./config";
 
 $(async (): Promise<void> => {
   await loadPromise;
-  Misc.loadCSS("/css/slimselect.min.css", true);
-  Misc.loadCSS("/css/balloon.min.css", true);
-
   CookiesModal.check();
 
   //this line goes back to pretty much the beginning of the project and im pretty sure its here
@@ -22,8 +19,8 @@ $(async (): Promise<void> => {
   $("body").css("transition", "background .25s, transform .05s");
   MerchBanner.showIfNotClosedBefore();
 
-  for (const fb of getActiveFunboxes()) {
-    fb.functions?.applyGlobalCSS?.();
+  for (const fb of getActiveFunboxesWithFunction("applyGlobalCSS")) {
+    fb.functions.applyGlobalCSS();
   }
 
   $("#app")

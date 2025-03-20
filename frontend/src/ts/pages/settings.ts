@@ -30,6 +30,7 @@ import {
   checkCompatibility,
 } from "@monkeytype/funbox";
 import { getActiveFunboxNames } from "../test/funbox/list";
+import { SnapshotPreset } from "../constants/default-snapshot";
 
 type SettingsGroups<T extends ConfigValue> = Record<string, SettingsGroup<T>>;
 
@@ -379,6 +380,11 @@ async function initGroups(): Promise<void> {
     UpdateConfig.setTapeMode,
     "button"
   ) as SettingsGroup<ConfigValue>;
+  groups["tapeMargin"] = new SettingsGroup(
+    "tapeMargin",
+    UpdateConfig.setTapeMargin,
+    "button"
+  ) as SettingsGroup<ConfigValue>;
   groups["timerOpacity"] = new SettingsGroup(
     "timerOpacity",
     UpdateConfig.setTimerOpacity,
@@ -694,6 +700,10 @@ async function fillSettingsPage(): Promise<void> {
     Config.customLayoutfluid.replace(/#/g, " ")
   );
 
+  $(".pageSettings .section[data-config-name='tapeMargin'] input").val(
+    Config.tapeMargin
+  );
+
   setEventDisabled(true);
   if (!groupsInitialized) {
     await initGroups();
@@ -784,7 +794,7 @@ function refreshTagsSettingsSection(): void {
 function refreshPresetsSettingsSection(): void {
   if (isAuthenticated() && DB.getSnapshot()) {
     const presetsEl = $(".pageSettings .section.presets .presetsList").empty();
-    DB.getSnapshot()?.presets?.forEach((preset: DB.SnapshotPreset) => {
+    DB.getSnapshot()?.presets?.forEach((preset: SnapshotPreset) => {
       presetsEl.append(`
       <div class="buttons preset" data-id="${preset._id}" data-name="${preset.name}" data-display="${preset.display}">
         <button class="presetButton">${preset.display}</button>
@@ -1148,6 +1158,42 @@ $(
       parseFloat(
         $(
           ".pageSettings .section[data-config-name='fontSize'] .inputAndButton input"
+        ).val() as string
+      )
+    );
+    if (didConfigSave) {
+      Notifications.add("Saved", 1, {
+        duration: 1,
+      });
+    }
+  }
+});
+
+$(
+  ".pageSettings .section[data-config-name='tapeMargin'] .inputAndButton button.save"
+).on("click", () => {
+  const didConfigSave = UpdateConfig.setTapeMargin(
+    parseFloat(
+      $(
+        ".pageSettings .section[data-config-name='tapeMargin'] .inputAndButton input"
+      ).val() as string
+    )
+  );
+  if (didConfigSave) {
+    Notifications.add("Saved", 1, {
+      duration: 1,
+    });
+  }
+});
+
+$(
+  ".pageSettings .section[data-config-name='tapeMargin'] .inputAndButton input"
+).on("keypress", (e) => {
+  if (e.key === "Enter") {
+    const didConfigSave = UpdateConfig.setTapeMargin(
+      parseFloat(
+        $(
+          ".pageSettings .section[data-config-name='tapeMargin'] .inputAndButton input"
         ).val() as string
       )
     );
